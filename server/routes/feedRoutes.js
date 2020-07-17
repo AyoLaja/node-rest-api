@@ -12,6 +12,7 @@ router.get("/posts", isAuth, feedController.getPosts);
 // POST /feed/post
 router.post(
   "/post",
+  isAuth,
   [
     check("title").trim().isLength({
       min: 5,
@@ -24,11 +25,12 @@ router.post(
 );
 
 // GET /post/:postId
-router.get("/post/:postId", feedController.getPost);
+router.get("/post/:postId", isAuth, feedController.getPost);
 
 // PUT /post/:postId - TO update posts
 router.put(
   "/post/:postId",
+  isAuth,
   [
     check("title").trim().isLength({
       min: 5,
@@ -42,6 +44,6 @@ router.put(
 );
 
 // DELETE /post/:postId
-router.delete("/post/:postId", feedController.deletePost);
+router.delete("/post/:postId", isAuth, feedController.deletePost);
 
 module.exports = router;

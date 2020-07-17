@@ -2,6 +2,8 @@ const { validationResult } = require("express-validator");
 const fs = require("fs");
 
 const Post = require("../models/postModel");
+const User = require("../models/userModel");
+const { post } = require("../routes/feedRoutes");
 
 exports.getPosts = (request, response, next) => {
   const currentPage = request.query.page || 1;
@@ -48,11 +50,12 @@ exports.createPost = (request, response, next) => {
   const imageUrl = request.file.path;
   const title = request.body.title;
   const content = request.body.content;
+  let creator;
   const post = new Post({
     title,
     content,
     imageUrl,
-    creator: { name: "Ayomide" },
+    creator: request.userId,
   });
 
   // Save post to db
@@ -60,9 +63,18 @@ exports.createPost = (request, response, next) => {
     .save()
     .then((result) => {
       // console.log(result);
+      return User.findById(request.userId);
+    })
+    .then((user) => {
+      creator = user;
+      user.posts.push(post);
+      return user.save();
+    })
+    .then((result) => {
       response.status(201).json({
         message: "Post created successfully",
-        post: result,
+        post: post,
+        creator: { _id: creator._id, name: creator.name },
       });
     })
     .catch((err) => {
@@ -126,6 +138,14 @@ exports.updatePost = (request, response, next) => {
         throw error;
       }
 
+      // Check to see if user is authorized to update the post
+      if (post.creator.toString() === request.userId) {
+        const error = new Error("Not suthorized");
+        error.statusCode = 403;
+        throw error;
+      }
+
+      // Checks if the existing image is the same as the incoming edited post image
       if (imageUrl !== post.imageUrl) {
         clearImage(post.imageUrl);
       }
@@ -155,13 +175,27 @@ exports.deletePost = (response, request, next) => {
         throw error;
       }
 
+      // Check to see if user is authorized to update the post
+      if (post.creator.toString() === request.userId) {
+        const error = new Error("Not suthorized");
+        error.statusCode = 403;
+        throw error;
+      }
+
       // Check if user is logged in
       clearImage(post.imageUrl);
 
       return Post.findByIdAndRemove(postId);
     })
-    .then((result) => {
+    .then(() => {
       // console.log(result);
+      return User.findById(request.userId);
+    })
+    .then((user) => {
+      user.pull(postId);
+      return user.save();
+    })
+    .then(() => {
       response.status(200).json({ message: "Post deleted" });
     })
     .catch((err) => {
