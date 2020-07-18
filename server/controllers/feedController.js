@@ -1,32 +1,35 @@
 const { validationResult } = require("express-validator");
 const fs = require("fs");
+const path = require("path");
 
 const Post = require("../models/postModel");
 const User = require("../models/userModel");
 
-exports.getPosts = async (request, response, next) => {
-  const currentPage = request.query.page || 1;
+exports.getPosts = async (req, res, next) => {
+  const currentPage = req.query.page || 1;
   const perPage = 2;
 
   try {
-    const totalItems = await Post.populate("creator").find().countDocuments();
-    const posts = Post.find()
+    const totalItems = await Post.find().populate("creator").countDocuments();
+    const posts = await Post.find()
+      .populate("creator")
       .skip((currentPage - 1) * perPage)
       .limit(perPage);
 
-    response.status(200).json({
+    res.status(200).json({
       message: "Posts successfully fetched",
       posts: posts,
       totalItems,
     });
   } catch (err) {
     if (!err.statusCode) err.statusCode = 500;
+    console.log(err);
     next(err);
   }
 };
 
-exports.createPost = async (request, response, next) => {
-  const errors = validationResult(request);
+exports.createPost = async (req, res, next) => {
+  const errors = validationResult(req);
 
   // Check if there are errors
   if (!errors.isEmpty()) {
@@ -35,33 +38,33 @@ exports.createPost = async (request, response, next) => {
     throw error;
   }
 
-  if (!request.file) {
+  if (!req.file) {
     const error = new Error("No image provided");
     error.statusCode = 422;
     throw error;
   }
-  const imageUrl = request.file.path;
-  const title = request.body.title;
-  const content = request.body.content;
-  let creator;
+  const imageUrl = req.file.path;
+  console.log(req.file);
+  const title = req.body.title;
+  const content = req.body.content;
   const post = new Post({
     title,
     content,
     imageUrl,
-    creator: request.userId,
+    creator: req.userId,
   });
 
   // Save post to db
   try {
     await post.save();
-    const user = await User.findById(request.userId);
+    const user = await User.findById(req.userId);
     user.posts.push(post);
     await user.save();
 
-    response.status(201).json({
+    res.status(201).json({
       message: "Post created successfully",
       post: post,
-      creator: { _id: creator._id, name: creator.name },
+      creator: { _id: user._id, name: user.name },
     });
   } catch (err) {
     if (!err.statusCode) err.statusCode = 500;
@@ -72,11 +75,12 @@ exports.createPost = async (request, response, next) => {
   }
 };
 
-exports.getPost = async (request, response, next) => {
-  const postId = request.params.postId;
+exports.getPost = async (req, res, next) => {
+  const postId = req.params.postId;
 
   try {
     const post = await Post.findById(postId);
+    console.log(post);
 
     if (!post) {
       const error = new Error("Could not find post");
@@ -84,16 +88,16 @@ exports.getPost = async (request, response, next) => {
       throw error;
     }
 
-    response.status(200).json({ message: "Post fetched", post });
+    res.status(200).json({ message: "Post fetched", post });
   } catch (err) {
     if (!err.statusCode) err.statusCode = 500;
     next(err);
   }
 };
 
-exports.updatePost = async (request, response, next) => {
-  const postId = request.params.postId;
-  const errors = validationResult(request);
+exports.updatePost = async (req, res, next) => {
+  const postId = req.params.postId;
+  const errors = validationResult(req);
 
   // Check if there are errors
   if (!errors.isEmpty()) {
@@ -102,11 +106,11 @@ exports.updatePost = async (request, response, next) => {
     throw error;
   }
 
-  const title = request.body.title;
-  const content = request.body.content;
-  let imageUrl = request.body.image;
+  const title = req.body.title;
+  const content = req.body.content;
+  let imageUrl = req.body.image;
 
-  if (request.file) imageUrl = request.file;
+  if (req.file) imageUrl = req.file;
 
   if (!imageUrl) {
     const error = new Error("No file chosen");
@@ -124,8 +128,8 @@ exports.updatePost = async (request, response, next) => {
     }
 
     // Check to see if user is authorized to update the post
-    if (post.creator.toString() === request.userId) {
-      const error = new Error("Not suthorized");
+    if (post.creator.toString() !== req.userId) {
+      const error = new Error("Not authorized");
       error.statusCode = 403;
       throw error;
     }
@@ -141,16 +145,16 @@ exports.updatePost = async (request, response, next) => {
 
     const result = await post.save();
 
-    response.status(200).json({ message: "Post updated", post: result });
+    res.status(200).json({ message: "Post updated", post: result });
   } catch (err) {
     if (!err.statusCode) err.statusCode = 500;
     next(err);
   }
 };
 
-exports.deletePost = async (response, request, next) => {
-  // console.log(request.params);
-  const postId = request.params.postId;
+exports.deletePost = async (req, res, next) => {
+  // console.log(req.params);
+  const postId = req.params.postId;
 
   try {
     const post = await Post.findById(postId);
@@ -161,8 +165,8 @@ exports.deletePost = async (response, request, next) => {
     }
 
     // Check to see if user is authorized to update the post
-    if (post.creator.toString() === request.userId) {
-      const error = new Error("Not suthorized");
+    if (post.creator.toString() !== req.userId) {
+      const error = new Error("Not authorized");
       error.statusCode = 403;
       throw error;
     }
@@ -170,12 +174,12 @@ exports.deletePost = async (response, request, next) => {
     // Check if user is logged in
     clearImage(post.imageUrl);
 
-    await Post.findByIdAndRemove(postId);
-    const user = await User.findById(request.userId);
-    await user.pull(postId);
+    await Post.findOneAndRemove(postId);
+    const user = await User.findById(req.userId);
+    await user.posts.pull(postId);
     await user.save();
 
-    response.status(200).json({ message: "Post deleted" });
+    res.status(200).json({ message: "Post deleted" });
   } catch (err) {
     if (!err.statusCode) err.statusCode = 500;
     next(err);

@@ -12,7 +12,7 @@ router.put(
     body("email")
       .isEmail()
       .withMessage("Please enter valid email")
-      .custom((value, { request }) => {
+      .custom((value, { req }) => {
         //Should return true if validation succeeds
         return User.findOne({ email: value }).then((userDoc) => {
           if (userDoc) {

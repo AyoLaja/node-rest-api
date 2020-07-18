@@ -24,7 +24,7 @@ class Feed extends Component {
   componentDidMount() {
     fetch("http://localhost:8080/auth/status", {
       headers: {
-        Authorization: "Beaerer " + this.props.token,
+        Authorization: "Bearer " + this.props.token,
       },
     })
       .then((res) => {

@@ -1,13 +1,13 @@
 const jwt = require("jsonwebtoken");
 
-module.exports = (request, response, next) => {
-  const authHeader = request.get("Authorization");
+module.exports = (req, res, next) => {
+  const authHeader = req.get("Authorization");
   if (!authHeader) {
     const error = new Error("Not authenticated");
     error.statusCode = 401;
     throw error;
   }
-  const token = request.get("Authorization").split(" ")[1];
+  const token = req.get("Authorization").split(" ")[1];
   let decondedToken;
 
   try {
@@ -25,6 +25,6 @@ module.exports = (request, response, next) => {
     throw error;
   }
 
-  request.userId = decondedToken.userId;
+  req.userId = decondedToken.userId;
   next();
 };
