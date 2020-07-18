@@ -2,6 +2,7 @@ const { validationResult } = require("express-validator");
 const fs = require("fs");
 const path = require("path");
 
+const io = require("../socket");
 const Post = require("../models/postModel");
 const User = require("../models/userModel");
 
@@ -43,8 +44,8 @@ exports.createPost = async (req, res, next) => {
     error.statusCode = 422;
     throw error;
   }
+
   const imageUrl = req.file.path;
-  console.log(req.file);
   const title = req.body.title;
   const content = req.body.content;
   const post = new Post({
@@ -61,9 +62,15 @@ exports.createPost = async (req, res, next) => {
     user.posts.push(post);
     await user.save();
 
+    // .broadcast to send a message to all users
+    // .emit to send a message to only connected users
+    io.getIO().emit("posts", {
+      action: "create",
+      post: { ...post._doc, creator: { _id: req.userId, name: user.name } },
+    });
     res.status(201).json({
       message: "Post created successfully",
-      post: post,
+      post,
       creator: { _id: user._id, name: user.name },
     });
   } catch (err) {

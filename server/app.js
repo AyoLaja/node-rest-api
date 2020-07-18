@@ -82,7 +82,15 @@ mongoose
   )
   .then(() => {
     const port = APPLICATION_PORT || 8080;
-    app.listen(port);
+    const server = app.listen(port);
+    const io = require("./socket").init(server);
+
+    // Connection between server and client
+    // Executes for every new client thst connects
+    io.on("connection", (socket) => {
+      console.log("Client connected");
+    });
+
     console.log(`listening at ${port}`);
   })
   .catch((err) => {
