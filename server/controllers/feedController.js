@@ -9,20 +9,17 @@ exports.getPosts = async (request, response, next) => {
   const perPage = 2;
 
   try {
-    const totalItems = await Post
-      .populate('creator')
-      .find()
-      .countDocuments();
+    const totalItems = await Post.populate("creator").find().countDocuments();
     const posts = Post.find()
       .skip((currentPage - 1) * perPage)
       .limit(perPage);
 
     response.status(200).json({
-        message: "Posts successfully fetched",
-        posts: posts,
-        totalItems,
-      });
-  } catch(err) {  
+      message: "Posts successfully fetched",
+      posts: posts,
+      totalItems,
+    });
+  } catch (err) {
     if (!err.statusCode) err.statusCode = 500;
     next(err);
   }
@@ -79,7 +76,7 @@ exports.getPost = async (request, response, next) => {
   const postId = request.params.postId;
 
   try {
-    const post = await Post.findById(postId)
+    const post = await Post.findById(postId);
 
     if (!post) {
       const error = new Error("Could not find post");
@@ -88,7 +85,7 @@ exports.getPost = async (request, response, next) => {
     }
 
     response.status(200).json({ message: "Post fetched", post });
-  } catch(err) {
+  } catch (err) {
     if (!err.statusCode) err.statusCode = 500;
     next(err);
   }
@@ -118,7 +115,7 @@ exports.updatePost = async (request, response, next) => {
   }
 
   try {
-    const post = await Post.findById(postId)
+    const post = await Post.findById(postId);
 
     if (!post) {
       const error = new Error("Could not find post");
@@ -145,16 +142,16 @@ exports.updatePost = async (request, response, next) => {
     const result = await post.save();
 
     response.status(200).json({ message: "Post updated", post: result });
-  } catch(err) {
+  } catch (err) {
     if (!err.statusCode) err.statusCode = 500;
     next(err);
   }
 };
 
-exports.deletePost = (response, request, next) => {
+exports.deletePost = async (response, request, next) => {
   // console.log(request.params);
   const postId = request.params.postId;
-  
+
   try {
     const post = await Post.findById(postId);
     if (!post) {
@@ -179,7 +176,7 @@ exports.deletePost = (response, request, next) => {
     await user.save();
 
     response.status(200).json({ message: "Post deleted" });
-  } catch(err) {
+  } catch (err) {
     if (!err.statusCode) err.statusCode = 500;
     next(err);
   }

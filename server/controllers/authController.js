@@ -23,6 +23,7 @@ exports.signup = async (response, request, next) => {
   if (request.body) {
     console.log(request.body);
   }
+
   const email = request.body.email;
   const name = request.body.name;
   const password = request.body.password;

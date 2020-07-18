@@ -5,6 +5,7 @@ const path = require("path");
 const multer = require("multer");
 const cors = require("cors");
 const app = express();
+require("dotenv").config();
 
 const feedRoutes = require("./routes/feedRoutes");
 const authRoutes = require("./routes/authRoutes");
@@ -82,14 +83,17 @@ const mongooseConfig = {
   useUnifiedTopology: true,
 };
 
+const { MONGODB_USERNAME, MONGODB_PASSWORD, APPLICATION_PORT } = process.env;
+
 mongoose
   .connect(
-    "mongodb+srv://ayo_laja:c0mpwuMDft5vOqkB@cluster0-wlgys.mongodb.net/messages?retryWrites=true&w=majority",
+    `mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@cluster0-wlgys.mongodb.net/messages?retryWrites=true&w=majority`,
     mongooseConfig
   )
   .then(() => {
-    app.listen(8080);
-    console.log("listening at 8080");
+    const port = APPLICATION_PORT || 8080;
+    app.listen(port);
+    console.log(`listening at ${port}`);
   })
   .catch((err) => {
     console.log(err);
