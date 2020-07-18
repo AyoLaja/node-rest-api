@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 
 const User = require("../models/userModel");
 
-exports.signup = (response, request, next) => {
+exports.signup = async (response, request, next) => {
   console.log("sign up started");
   const errors = validationResult(request);
   console.log(errors.isEmpty());
@@ -27,72 +27,99 @@ exports.signup = (response, request, next) => {
   const name = request.body.name;
   const password = request.body.password;
   console.log(name, email, password);
-  bcrypt
-    .hash(password, 12)
-    .then((hashedPassword) => {
-      const user = new User({
-        name: name,
-        email: email,
-        password: hashedPassword,
-      });
 
-      return user.save();
-    })
-    .then((result) => {
-      response
-        .status(201)
-        .json({ message: "User created successfully", userId: result._id });
-    })
-    .catch((err) => {
-      console.log(err);
-      if (!err.statusCode) err.statusCode = 500;
-
-      next(err);
+  try {
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const user = new User({
+      name: name,
+      email: email,
+      password: hashedPassword,
     });
+
+    const result = await user.save();
+    response
+      .status(201)
+      .json({ message: "User created successfully", userId: result._id });
+  } catch (err) {
+    if (!err.statusCode) err.statusCode = 500;
+    next(err);
+  }
 };
 
-exports.login = (response, request, next) => {
+exports.login = async (response, request, next) => {
   const email = request.body.email;
   const password = request.body.password;
-  let loadedUser;
 
-  User.findOne({ email })
-    .then((user) => {
-      if (!user) {
-        const error = new Error("User not found");
-        error.statusCode = 401;
-        throw error;
-      }
+  try {
+    const user = await User.findOne({ email });
 
-      loadedUser = user;
-      return bcrypt.compare(password, user.password);
-    })
-    .then((isEqual) => {
-      if (!isEqual) {
-        const error = new Error("Wrong pasword");
-        error.statusCode = 401;
-        throw error;
-      }
+    if (!user) {
+      const error = new Error("User not found");
+      error.statusCode = 401;
+      throw error;
+    }
 
-      // Generate new token
-      const token = jwt.sign(
-        {
-          email: loadedUser.email,
-          userId: loadedUser._id.toString(),
-        },
-        "somesupersecretsecret",
-        { expiresIn: "1h" }
-      );
+    const equalPasswords = await bcrypt.compare(password, user.password);
 
-      response.status(200).josn({
-        token,
-        userId: loadedUser._id.toString(),
-      });
-    })
-    .catch((err) => {
-      if (!err.statusCode) err.statusCode = 500;
+    if (!equalPasswords) {
+      const error = new Error("Wrong pasword");
+      error.statusCode = 401;
+      throw error;
+    }
 
-      next(err);
+    // Generate new token
+    const token = jwt.sign(
+      {
+        email: user.email,
+        userId: user._id.toString(),
+      },
+      "somesupersecretsecret",
+      { expiresIn: "1h" }
+    );
+
+    response.status(200).json({
+      token,
+      userId: user._id.toString(),
     });
+  } catch (err) {
+    if (!err.statusCode) err.statusCode = 500;
+    next(err);
+  }
 };
-// "mongodb+srv://ayo_laja:c0mpwuMDft5vOqkB@cluster0-wlgys.mongodb.net/messages?retryWrites=true&w=majority"
+
+exports.getUserStatus = async (request, response, next) => {
+  try {
+    const user = await User.findById(request.userId);
+    if (!user) {
+      const error = new Error("User not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    response.status(200).json({ status: user.status });
+  } catch (err) {
+    if (!err.statusCode) err.statusCode = 500;
+    next(err);
+  }
+};
+
+exports.updateUserStatus = async (request, response, next) => {
+  const newStatus = request.body.status;
+
+  try {
+    const user = await User.findById(request.userId);
+
+    if (!user) {
+      const error = new Error("User not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    user.status = newStatus;
+    await user.save();
+    response.status(200).json({ message: "User updated succesfully" });
+  } catch (err) {
+    if (!err.statusCode) err.statusCode = 500;
+    next(err);
+  }
+};

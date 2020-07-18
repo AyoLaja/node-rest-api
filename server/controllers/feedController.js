@@ -3,36 +3,32 @@ const fs = require("fs");
 
 const Post = require("../models/postModel");
 const User = require("../models/userModel");
-const { post } = require("../routes/feedRoutes");
 
-exports.getPosts = (request, response, next) => {
+exports.getPosts = async (request, response, next) => {
   const currentPage = request.query.page || 1;
   const perPage = 2;
-  let totalItems;
 
-  Post.find()
-    .countDocuments()
-    .then((count) => {
-      totalItems = count;
-      return Post.find()
-        .skip((currentPage - 1) * perPage)
-        .limit(perPage);
-    })
-    .then((results) => {
-      response.status(200).json({
+  try {
+    const totalItems = await Post
+      .populate('creator')
+      .find()
+      .countDocuments();
+    const posts = Post.find()
+      .skip((currentPage - 1) * perPage)
+      .limit(perPage);
+
+    response.status(200).json({
         message: "Posts successfully fetched",
-        posts: results,
+        posts: posts,
         totalItems,
       });
-    })
-    .catch((err) => {
-      if (!err.statusCode) err.statusCode = 500;
-
-      next(err);
-    });
+  } catch(err) {  
+    if (!err.statusCode) err.statusCode = 500;
+    next(err);
+  }
 };
 
-exports.createPost = (request, response, next) => {
+exports.createPost = async (request, response, next) => {
   const errors = validationResult(request);
 
   // Check if there are errors
@@ -59,54 +55,46 @@ exports.createPost = (request, response, next) => {
   });
 
   // Save post to db
-  post
-    .save()
-    .then((result) => {
-      // console.log(result);
-      return User.findById(request.userId);
-    })
-    .then((user) => {
-      creator = user;
-      user.posts.push(post);
-      return user.save();
-    })
-    .then((result) => {
-      response.status(201).json({
-        message: "Post created successfully",
-        post: post,
-        creator: { _id: creator._id, name: creator.name },
-      });
-    })
-    .catch((err) => {
-      if (!err.statusCode) {
-        err.statusCode = 500;
-      }
-      // Cannot throw error here because we are inside an async function
-      // Call next() to go to the next express error handling middleware
-      next(err);
+  try {
+    await post.save();
+    const user = await User.findById(request.userId);
+    user.posts.push(post);
+    await user.save();
+
+    response.status(201).json({
+      message: "Post created successfully",
+      post: post,
+      creator: { _id: creator._id, name: creator.name },
     });
+  } catch (err) {
+    if (!err.statusCode) err.statusCode = 500;
+
+    // Cannot throw error here because we are inside an async function
+    // Call next() to go to the next express error handling middleware
+    next(err);
+  }
 };
 
-exports.getPost = (request, response, next) => {
+exports.getPost = async (request, response, next) => {
   const postId = request.params.postId;
-  Post.findById(postId)
-    .then((post) => {
-      if (!post) {
-        const error = new Error("Could not find post");
-        error.statusCode = 404;
-        throw error;
-      }
 
-      response.status(200).json({ message: "Post fetched", post });
-    })
-    .catch((err) => {
-      if (!err.statusCode) err.statusCode = 500;
+  try {
+    const post = await Post.findById(postId)
 
-      next(err);
-    });
+    if (!post) {
+      const error = new Error("Could not find post");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    response.status(200).json({ message: "Post fetched", post });
+  } catch(err) {
+    if (!err.statusCode) err.statusCode = 500;
+    next(err);
+  }
 };
 
-exports.updatePost = (request, response, next) => {
+exports.updatePost = async (request, response, next) => {
   const postId = request.params.postId;
   const errors = validationResult(request);
 
@@ -129,79 +117,72 @@ exports.updatePost = (request, response, next) => {
     throw error;
   }
 
-  // Update in the db
-  Post.findById(postId)
-    .then((post) => {
-      if (!post) {
-        const error = new Error("Could not find post");
-        error.statusCode = 404;
-        throw error;
-      }
+  try {
+    const post = await Post.findById(postId)
 
-      // Check to see if user is authorized to update the post
-      if (post.creator.toString() === request.userId) {
-        const error = new Error("Not suthorized");
-        error.statusCode = 403;
-        throw error;
-      }
+    if (!post) {
+      const error = new Error("Could not find post");
+      error.statusCode = 404;
+      throw error;
+    }
 
-      // Checks if the existing image is the same as the incoming edited post image
-      if (imageUrl !== post.imageUrl) {
-        clearImage(post.imageUrl);
-      }
+    // Check to see if user is authorized to update the post
+    if (post.creator.toString() === request.userId) {
+      const error = new Error("Not suthorized");
+      error.statusCode = 403;
+      throw error;
+    }
 
-      post.title = title;
-      post.imageUrl = imageUrl;
-      post.content = content;
-      return post.save();
-    })
-    .then((result) => {
-      response.status(200).json({ message: "Post updated", post: result });
-    })
-    .catch((err) => {
-      if (!err.statusCode) err.statusCode = 500;
-      next(err);
-    });
+    // Checks if the existing image is the same as the incoming edited post image
+    if (imageUrl !== post.imageUrl) {
+      clearImage(post.imageUrl);
+    }
+
+    post.title = title;
+    post.imageUrl = imageUrl;
+    post.content = content;
+
+    const result = await post.save();
+
+    response.status(200).json({ message: "Post updated", post: result });
+  } catch(err) {
+    if (!err.statusCode) err.statusCode = 500;
+    next(err);
+  }
 };
 
 exports.deletePost = (response, request, next) => {
   // console.log(request.params);
   const postId = request.params.postId;
-  Post.findById(postId)
-    .then((post) => {
-      if (!post) {
-        const error = new Error("Could not find post");
-        error.statusCode = 404;
-        throw error;
-      }
+  
+  try {
+    const post = await Post.findById(postId);
+    if (!post) {
+      const error = new Error("Could not find post");
+      error.statusCode = 404;
+      throw error;
+    }
 
-      // Check to see if user is authorized to update the post
-      if (post.creator.toString() === request.userId) {
-        const error = new Error("Not suthorized");
-        error.statusCode = 403;
-        throw error;
-      }
+    // Check to see if user is authorized to update the post
+    if (post.creator.toString() === request.userId) {
+      const error = new Error("Not suthorized");
+      error.statusCode = 403;
+      throw error;
+    }
 
-      // Check if user is logged in
-      clearImage(post.imageUrl);
+    // Check if user is logged in
+    clearImage(post.imageUrl);
 
-      return Post.findByIdAndRemove(postId);
-    })
-    .then(() => {
-      // console.log(result);
-      return User.findById(request.userId);
-    })
-    .then((user) => {
-      user.pull(postId);
-      return user.save();
-    })
-    .then(() => {
-      response.status(200).json({ message: "Post deleted" });
-    })
-    .catch((err) => {
-      if (!err.statusCode) err.statusCode = 500;
-      next(err);
-    });
+    await Post.findByIdAndRemove(postId);
+    const user = await User.findById(request.userId);
+    await user.pull(postId);
+    await user.save();
+
+    response.status(200).json({ message: "Post deleted" });
+  } catch(err) {
+    if (!err.statusCode) err.statusCode = 500;
+    next(err);
+  }
 };
 
 const clearImage = (filePath) => {
