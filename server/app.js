@@ -71,6 +71,7 @@ app.use((error, req, res, next) => {
 const mongooseConfig = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
+  useFindAndModify: true,
 };
 
 const { MONGODB_USERNAME, MONGODB_PASSWORD, APPLICATION_PORT } = process.env;
