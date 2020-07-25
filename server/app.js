@@ -4,6 +4,8 @@ const mongoose = require("mongoose");
 const path = require("path");
 const multer = require("multer");
 const app = express();
+const helmet = require("helmet");
+const compression = require("compression");
 require("dotenv").config();
 
 const feedRoutes = require("./routes/feedRoutes");
@@ -29,6 +31,12 @@ const fileFilter = (req, file, callback) => {
     callback(null, true);
   }
 };
+
+// helmet adds headers to our response for security purposes
+app.use(helmet());
+
+// compression aids in compressing assets
+app.use(compression());
 
 // Parses incoming JSON data. Type: application/json
 // app.use(bodyParser.urlencoded({ extended: false }));
