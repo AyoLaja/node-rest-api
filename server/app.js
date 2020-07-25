@@ -8,9 +8,6 @@ const helmet = require("helmet");
 const compression = require("compression");
 require("dotenv").config();
 
-const feedRoutes = require("./routes/feedRoutes");
-const authRoutes = require("./routes/authRoutes");
-
 // Configuring where files get stored on multer
 const fileStorage = multer.diskStorage({
   destination: (req, file, callback) => {
@@ -61,10 +58,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Forward incomng reqs to feed routes
-app.use("/feed", feedRoutes);
-app.use("/auth", authRoutes);
-
 // Error handling middleware
 // Will execute anytime an error is forwarded with next()
 app.use((error, req, res, next) => {
@@ -91,15 +84,7 @@ mongoose
   )
   .then(() => {
     const port = APPLICATION_PORT || 8080;
-    const server = app.listen(port);
-    const io = require("./socket").init(server);
-
-    // Connection between server and client
-    // Executes for every new client thst connects
-    io.on("connection", (socket) => {
-      console.log("Client connected");
-    });
-
+    app.listen(port);
     console.log(`listening at ${port}`);
   })
   .catch((err) => {
